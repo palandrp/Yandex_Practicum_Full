@@ -144,6 +144,8 @@ services:
         - elasticsearch
     ports:
         - "8080:8000"
+    links:
+        - elasticsearch:elastic
 
   movies-auth:
     build:
