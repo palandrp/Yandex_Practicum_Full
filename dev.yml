@@ -1,0 +1,125 @@
+version: '3.4'
+
+services:
+
+  redis:
+    image: redis:6-alpine
+    container_name: ypract_redis
+    ports: 
+        - 6379:6379
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.4
+    container_name: ypract_elasticsearch
+    environment:
+        - discovery.type=single-node
+    ports: 
+        - 9200:9200
+
+  movies-admin-postgres:
+    image: postgres:13-alpine
+    container_name: admin_postgres
+    volumes:
+        - ypract_admin_postgres_vol:/var/lib/postgresql/data
+    environment:
+        - POSTGRES_HOST=movies-admin-postgres
+        - POSTGRES_PORT=5432
+        - POSTGRES_DB=movies
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=superPassword
+    ports:
+        - 5432:5432
+
+  movies-auth-postgres:
+    image: postgres:13-alpine
+    container_name: auth_postgres
+    volumes:
+        - ypract_auth_postgres_vol:/var/lib/postgresql/data
+    environment:
+        - POSTGRES_HOST=movies-auth-postgres
+        - POSTGRES_PORT=5432
+        - POSTGRES_DB=auth
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=superPassword
+    ports:
+        - 5433:5432
+
+  movies-admin-nginx:
+    image: nginx:latest
+    container_name: admin_nginx
+    volumes:
+        - ./admin/admin_panel/compose/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+        - ./admin/admin_panel/compose/dev/nginx/configs:/etc/nginx/conf.d:ro
+        - ./admin/admin_panel/movies_admin/static:/data/static
+    ports:
+        - 80:80
+    depends_on:
+        - movies-admin-django
+
+  movies-api-nginx:
+    build: ./api/docker/nginx/
+    container_name: api_nginx
+    ports:
+        - 88:80
+    depends_on:
+        - movies-api
+
+  movies-etl:
+    build:
+        context: ./etl
+        dockerfile: ./compose/etl/Dockerfile
+    container_name: movies_etl
+    depends_on:
+        - movies-admin-postgres
+        - movies-admin-django
+        - elasticsearch
+    env_file:
+        - ./etl/.envs/etl.env
+
+  movies-admin-django:
+    build:
+        context: ./admin/admin_panel
+        dockerfile: ./compose/dev/django/Dockerfile
+    image: admin_django
+    container_name: admin_django
+    volumes:
+        - ./admin/admin_panel/movies_admin:/app
+    env_file:
+        - ./admin/admin_panel/.envs/dev/django.env
+        - ./admin/admin_panel/.envs/dev/postgres.env
+    depends_on:
+        - movies-admin-postgres
+    ports:
+        - 8000:8000
+
+  movies-api:
+    build:
+        context: ./api
+        dockerfile: ./docker/api/Dockerfile
+    image: movies_api
+    depends_on:
+        - redis
+        - elasticsearch
+    ports:
+        - "8080:8000"
+
+  movies-auth:
+    build:
+        context: ./auth
+        dockerfile: ./compose/dev/auth/Dockerfile
+    image: movies_auth
+    container_name: movies_auth
+    command: python app.py
+    volumes:
+        - ./auth/auth:/app/auth
+        - ./auth/app.py:/app/app.py:ro
+        - ./auth/.envs/dev/auth.env:/app/.env:ro
+    ports: 
+        - "5000:5000"
+    depends_on:
+        - movies-auth-postgres
+        - redis
+
+volumes:
+    ypract_auth_postgres_vol:
+    ypract_admin_postgres_vol:
