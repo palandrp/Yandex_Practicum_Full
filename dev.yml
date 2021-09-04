@@ -116,6 +116,10 @@ services:
         python manage.py collectstatic --noinput && 
         python manage.py migrate &&
         python manage.py createsuperuser --noinput &&
+        python manage.py generate_catalog --entity=persons --quantity=1000 &&
+        python manage.py generate_catalog --entity=genres --quantity=100 &&
+        python manage.py generate_catalog --entity=tvseries --quantity=10 &&
+        python manage.py generate_catalog --entity=movies --quantity=1000 &&
         python manage.py runserver 0.0.0.0:8000"
     depends_on:
         - movies-admin-postgres
