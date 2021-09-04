@@ -1,0 +1,12 @@
+[submodule "auth"]
+	path = auth
+	url = https://github.com/medik88/Auth_sprint_2
+[submodule "api"]
+	path = api
+	url = https://github.com/medik88/Async_API_sprint_2
+[submodule "admin"]
+	path = admin
+	url = https://github.com/vladchoe/Admin_panel_sprint_2
+[submodule "etl"]
+	path = etl
+	url = https://github.com/vladchoe/ETL
