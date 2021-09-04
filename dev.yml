@@ -138,6 +138,7 @@ services:
         context: ./api
         dockerfile: ./docker/api/Dockerfile
     image: movies_api
+    container_name: ypract_movies_api
     depends_on:
         - redis
         - elasticsearch
