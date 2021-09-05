@@ -18,6 +18,13 @@ services:
     ports: 
         - 9200:9200
 
+  jaegertracing:
+    image: jaegertracing/all-in-one:latest
+    container_name: ypract_jaegertracing
+    ports:
+        - 6831:6831/udp
+        - 16686:16686
+
   movies-admin-postgres:
     image: postgres:13-alpine
     container_name: ypract_admin_postgres
