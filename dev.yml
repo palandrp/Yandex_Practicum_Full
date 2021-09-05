@@ -107,15 +107,11 @@ services:
         dockerfile: ./compose/dev/django/Dockerfile
     image: admin_django
     container_name: ypract_admin_django
-    environment:
-        - DJANGO_SUPERUSER_USERNAME=admin
-        - DJANGO_SUPERUSER_PASSWORD=admin
-        - DJANGO_SUPERUSER_EMAIL=admin@admin.ux
     command: >
         bash -c "
         python manage.py collectstatic --noinput && 
         python manage.py migrate &&
-        python manage.py createsuperuser --noinput &&
+        python manage.py init_admin &&
         python manage.py generate_catalog --entity=persons --quantity=1000 &&
         python manage.py generate_catalog --entity=genres --quantity=100 &&
         python manage.py generate_catalog --entity=tvseries --quantity=10 &&
