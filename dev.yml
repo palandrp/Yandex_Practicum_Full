@@ -80,6 +80,20 @@ services:
         - movies-api:api
     restart: always
 
+  movies-auth-nginx:
+    image: nginx:latest
+    container_name: ypract_auth_nginx
+    volumes:
+      - ./auth/compose/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./auth/compose/dev/nginx/configs:/etc/nginx/conf.d:ro
+    depends_on:
+      - movies-auth
+    ports:
+      - "8888:80"
+    links:
+      - movies-auth:auth
+    restart: always
+
   movies-pg-es-etl:
     build:
         context: ./etl
@@ -157,6 +171,7 @@ services:
         - redis
     volumes:
         - ./auth/auth:/app/auth
+        - ./auth/migrations:/app/migrations
         - ./auth/app.py:/app/app.py:ro
         - ./auth/.envs/dev/auth.env:/app/.env:ro
     ports: 
