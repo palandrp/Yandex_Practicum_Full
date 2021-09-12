@@ -1,8 +1,8 @@
-version: '3.4'
+version: '3.9'
 
 services:
 
-  redis:
+  ypract-redis:
     image: redis:6-alpine
     container_name: ypract_redis
     volumes:
@@ -10,22 +10,24 @@ services:
     ports: 
         - 6379:6379
 
-  elasticsearch:
+  ypract-elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.13.4
     container_name: ypract_elasticsearch
     environment:
         - discovery.type=single-node
     ports: 
         - 9200:9200
+    profiles:
+        - search
 
-  jaegertracing:
+  ypract-jaegertracing:
     image: jaegertracing/all-in-one:latest
     container_name: ypract_jaegertracing
     ports:
         - 6831:6831/udp
         - 16686:16686
 
-  movies-admin-postgres:
+  ypract-admin-postgres:
     image: postgres:13-alpine
     container_name: ypract_admin_postgres
     environment:
@@ -38,12 +40,14 @@ services:
         - ypract_admin_postgres_vol:/var/lib/postgresql/data
     ports:
         - 5432:5432
+    profiles:
+        - admin
 
-  movies-auth-postgres:
+  ypract-auth-postgres:
     image: postgres:13-alpine
     container_name: ypract_auth_postgres
     environment:
-        - POSTGRES_HOST=movies-auth-postgres
+        - POSTGRES_HOST=ypract-auth-postgres
         - POSTGRES_PORT=5432
         - POSTGRES_DB=auth
         - POSTGRES_USER=postgres
@@ -52,8 +56,10 @@ services:
         - ypract_auth_postgres_vol:/var/lib/postgresql/data
     ports:
         - 5433:5432
+    profiles:
+        - auth
 
-  movies-admin-nginx:
+  ypract-admin-nginx:
     image: nginx:latest
     container_name: ypract_admin_nginx
     volumes:
@@ -63,70 +69,80 @@ services:
     ports:
         - 80:80
     depends_on:
-        - movies-admin-django
+        - ypract-admin-django
     links:
-        - movies-admin-django:django
+        - ypract-admin-django:django
+    profiles:
+        - admin
     restart: always
 
 
-  movies-api-nginx:
+  ypract-search-api-nginx:
     build: ./api/docker/nginx/
     container_name: ypract_api_nginx
     ports:
         - 88:80
     depends_on:
-        - movies-api
+        - ypract-search-api
     links:
-        - movies-api:api
+        - ypract-search-api:api
+    profiles:
+        - search
     restart: always
 
-  movies-auth-nginx:
+  ypract-auth-nginx:
     image: nginx:latest
     container_name: ypract_auth_nginx
     volumes:
-      - ./auth/compose/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./auth/compose/dev/nginx/configs:/etc/nginx/conf.d:ro
+        - ./auth/compose/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+        - ./auth/compose/dev/nginx/configs:/etc/nginx/conf.d:ro
     depends_on:
-      - movies-auth
+        - ypract-auth
     ports:
-      - "8888:80"
+        - "8888:80"
     links:
-      - movies-auth:auth
+        - ypract-auth:auth
+    profiles:
+        - auth
     restart: always
 
-  movies-pg-es-etl:
+  ypract-pg-es-etl:
     build:
         context: ./etl
         dockerfile: ./compose/etl/Dockerfile
-    container_name: ypract_movies_pg_es_etl
+    container_name: ypract_pg_es_etl
     depends_on:
-        - movies-admin-postgres
-        - movies-admin-django
-        - elasticsearch
+        - ypract-admin-postgres
+        - ypract-admin-django
+        - ypract-elasticsearch
     env_file:
         - ./etl/.envs/etl.env
+    profiles:
+        - etl
 
-  sqlite-pg-etl:
+  ypract-sqlite-pg-etl:
     build:
         context: ./admin/admin_panel
         dockerfile: compose/dev/etl/Dockerfile
-    image: sqlite_pg_etl
+    image: ypract_sqlite_pg_etl
     container_name: ypract_sqlite_pg_etl
     command: python load_data.py
     depends_on:
-        - movies-admin-postgres
+        - ypract-admin-postgres
     env_file:
         - ./admin/admin_panel/.envs/dev/postgres.env
     volumes:
-        - ./admin/admin_panel/sqlite_to_postgres:/app
+        - ./admin/admin_panel/ypract_sqlite_to_postgres:/app
     links:
-        - movies-admin-postgres:postgres
+        - ypract-admin-postgres:postgres
+    profiles:
+        - etl
 
-  movies-admin-django:
+  ypract-admin-django:
     build:
         context: ./admin/admin_panel
         dockerfile: ./compose/dev/django/Dockerfile
-    image: admin_django
+    image: ypract_admin_django
     container_name: ypract_admin_django
     command: >
         bash -c "
@@ -134,7 +150,7 @@ services:
         python manage.py migrate &&
         python manage.py runserver 0.0.0.0:8000"
     depends_on:
-        - movies-admin-postgres
+        - ypract-admin-postgres
     env_file:
         - ./admin/admin_panel/.envs/dev/django.env
         - ./admin/admin_panel/.envs/dev/postgres.env
@@ -143,32 +159,36 @@ services:
     ports:
         - 8000:8000
     links:
-        - movies-admin-postgres:postgres
+        - ypract-admin-postgres:postgres
+    profiles:
+        - admin
 
-  movies-api:
+  ypract-search-api:
     build:
         context: ./api
         dockerfile: ./docker/api/Dockerfile
-    image: movies_api
-    container_name: ypract_movies_api
+    image: ypract_search_api
+    container_name: ypract_search_api
     depends_on:
-        - redis
-        - elasticsearch
+        - ypract-redis
+        - ypract-elasticsearch
     ports:
         - "8080:8000"
     links:
-        - elasticsearch:elastic
+        - ypract-elasticsearch:elastic
+    profiles:
+        - search
 
-  movies-auth:
+  ypract-auth:
     build:
         context: ./auth
         dockerfile: ./compose/dev/auth/Dockerfile
-    image: movies_auth
-    container_name: ypract_movies_auth
+    image: ypract_auth
+    container_name: ypract_auth
     command: python app.py
     depends_on:
-        - movies-auth-postgres
-        - redis
+        - ypract-auth-postgres
+        - ypract-redis
     volumes:
         - ./auth/auth:/app/auth
         - ./auth/migrations:/app/migrations
@@ -177,7 +197,9 @@ services:
     ports: 
         - "5000:5000"
     links:
-        - movies-auth-postgres:postgres
+        - ypract-auth-postgres:postgres
+    profiles:
+        - auth
 
 volumes:
     ypract_redis_vol:
